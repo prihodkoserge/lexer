@@ -42,3 +42,7 @@ const runScanner = content => {
 };
 
 console.log(runScanner(fileContent));
+
+module.exports = {
+  runScanner
+};
