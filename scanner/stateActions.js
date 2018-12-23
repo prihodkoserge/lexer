@@ -1,8 +1,12 @@
 const constants = require("./constants");
+const utils = require("./utils");
 
 const setNext = nextState => state => ({ ...state, current: nextState });
 
-const movePointer = () => state => ({ ...state, pos: state.pos + 1 });
+const movePointer = input => state => {
+  const normalizedPos = utils.getNormalizedPos(state, input);
+  return { ...state, pos: state.pos + 1, normalizedPos };
+};
 
 const updateCurrentLexeme = input => state => ({
   ...state,
@@ -16,18 +20,24 @@ const raiseError = error => state => ({
   errors: [...state.errors, error]
 });
 
-const addIdentifier = lexeme => state => {
+const addIdentifier = (lexeme, checkpoint) => state => {
   if (state.identifiers[lexeme]) {
     return {
       ...state,
-      lexemes: [...state.lexemes, state.identifiers[lexeme]]
+      lexemes: [
+        ...state.lexemes,
+        utils.makeLexeme(state.identifiers[lexeme], checkpoint)
+      ]
     };
   }
 
   if (state.keywords[lexeme]) {
     return {
       ...state,
-      lexemes: [...state.lexemes, state.keywords[lexeme]]
+      lexemes: [
+        ...state.lexemes,
+        utils.makeLexeme(state.keywords[lexeme], checkpoint)
+      ]
     };
   }
 
@@ -35,7 +45,7 @@ const addIdentifier = lexeme => state => {
     constants.IDENTIFIERS_OFFSET + Object.keys(state.identifiers).length;
   return {
     ...state,
-    lexemes: [...state.lexemes, code],
+    lexemes: [...state.lexemes, utils.makeLexeme(code, checkpoint)],
     identifiers: {
       ...state.identifiers,
       [lexeme]: code
@@ -43,18 +53,21 @@ const addIdentifier = lexeme => state => {
   };
 };
 
-const addConstant = lexeme => state => {
+const addConstant = (lexeme, checkpoint) => state => {
   if (state.constants[lexeme]) {
     return {
       ...state,
-      lexemes: [...state.lexemes, state.constants[lexeme]]
+      lexemes: [
+        ...state.lexemes,
+        utils.makeLexeme(state.constants[lexeme], checkpoint)
+      ]
     };
   }
 
   const code = constants.CONSTANTS_OFFSET + Object.keys(state.constants).length;
   return {
     ...state,
-    lexemes: [...state.lexemes, code],
+    lexemes: [...state.lexemes, utils.makeLexeme(code, checkpoint)],
     constants: {
       ...state.constants,
       [lexeme]: code
@@ -62,11 +75,14 @@ const addConstant = lexeme => state => {
   };
 };
 
-const addMultiDelim = lexeme => state => {
+const addMultiDelim = (lexeme, checkpoint) => state => {
   if (state.multiDelims[lexeme]) {
     return {
       ...state,
-      lexemes: [...state.lexemes, state.multiDelims[lexeme]]
+      lexemes: [
+        ...state.lexemes,
+        utils.makeLexeme(state.multiDelims[lexeme], checkpoint)
+      ]
     };
   }
 
@@ -74,7 +90,7 @@ const addMultiDelim = lexeme => state => {
     constants.MULTI_DELIMS_OFFSET + Object.keys(state.multiDelims).length;
   return {
     ...state,
-    lexemes: [...state.lexemes, code],
+    lexemes: [...state.lexemes, utils.makeLexeme(code, checkpoint)],
     multiDelims: {
       ...state.multiDelims,
       [lexeme]: code
@@ -82,9 +98,12 @@ const addMultiDelim = lexeme => state => {
   };
 };
 
-const addSingleDelim = lexeme => state => ({
+const addSingleDelim = (lexeme, checkpoint) => state => ({
   ...state,
-  lexemes: [...state.lexemes, lexeme.charCodeAt(0)]
+  lexemes: [
+    ...state.lexemes,
+    utils.makeLexeme(lexeme.charCodeAt(0), checkpoint)
+  ]
 });
 
 module.exports = {

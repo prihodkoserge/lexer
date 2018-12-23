@@ -2,18 +2,21 @@ const actions = require("./stateActions");
 
 const compose = (...fns) => x => fns.reduceRight((y, f) => f(y), x);
 
+const enterStateReducerHOF = reducerFn => (state, action) =>
+  reducerFn({ ...state, checkpoint: state.normalizedPos }, action);
+
 const numberStateReducer = (state, action) => {
   if (action.symbolClass === "digit") {
     return compose(
       actions.setNext("number"),
       actions.updateCurrentLexeme(action.input),
-      actions.movePointer()
+      actions.movePointer(action.input)
     )(state);
   }
 
   return compose(
     actions.setNext("input"),
-    actions.addConstant(state.currentLexeme),
+    actions.addConstant(state.currentLexeme, state.checkpoint),
     actions.resetCurrentLexeme()
   )(state);
 };
@@ -23,13 +26,13 @@ const idnStateReducer = (state, action) => {
     return compose(
       actions.setNext("idn"),
       actions.updateCurrentLexeme(action.input),
-      actions.movePointer()
+      actions.movePointer(action.input)
     )(state);
   }
 
   return compose(
     actions.setNext("input"),
-    actions.addIdentifier(state.currentLexeme),
+    actions.addIdentifier(state.currentLexeme, state.checkpoint),
     actions.resetCurrentLexeme()
   )(state);
 };
@@ -37,46 +40,61 @@ const idnStateReducer = (state, action) => {
 const spaceStateReducer = (state, action) =>
   compose(
     actions.setNext("input"),
-    actions.movePointer()
+    actions.movePointer(action.input)
   )(state);
 
-const singleDelimStateReducer = (state, action) =>
-  compose(
+const singleDelimStateReducer = (state, action) => {
+  return compose(
     actions.setNext("input"),
-    actions.movePointer(),
-    actions.addSingleDelim(action.input)
+    actions.movePointer(action.input),
+    actions.addSingleDelim(action.input, state.checkpoint)
   )(state);
+};
 
 const commentEnterStateReducer = (state, action) =>
   compose(
     actions.setNext("commentBegin"),
-    actions.movePointer()
+    actions.movePointer(action.input)
   )(state);
 
 const commentBeginStateReducer = (state, action) => {
   if (action.input === "*") {
     return compose(
       actions.setNext("commentBody"),
-      actions.movePointer()
+      actions.movePointer(action.input)
     )(state);
   }
 
   return compose(
     actions.raiseError(error),
     actions.setNext("input"),
-    actions.movePointer()
+    actions.movePointer(action.input)
   )(state);
 };
 
 const commentBodyStateReducer = (state, action) => {
+  if (action.symbolClass === "eof") {
+    return compose(
+      actions.raiseError(`Unexpected end of file. Comment is not closed.`),
+      state => ({ ...state, done: true })
+    )(state);
+  }
+
   const next = action.input === "*" ? "commentEnding" : state.current;
   return compose(
     actions.setNext(next),
-    actions.movePointer()
+    actions.movePointer(action.input)
   )(state);
 };
 
 const commentEndingStateReducer = (state, action) => {
+  if (action.symbolClass === "eof") {
+    return compose(
+      actions.raiseError(`Unexpected end of file. Comment is not closed.`),
+      state => ({ ...state, done: true })
+    )(state);
+  }
+
   const next =
     action.input === "*"
       ? state.current
@@ -86,14 +104,14 @@ const commentEndingStateReducer = (state, action) => {
 
   return compose(
     actions.setNext(next),
-    actions.movePointer()
+    actions.movePointer(action.input)
   )(state);
 };
 
 const enterMultiDelim1StateReducer = (state, action) =>
   compose(
     actions.setNext("multiDelim1"),
-    actions.movePointer(),
+    actions.movePointer(action.input),
     actions.updateCurrentLexeme(action.input)
   )(state);
 
@@ -101,16 +119,19 @@ const multiDelim1StateReducer = (state, action) => {
   if (action.input === "=") {
     return compose(
       actions.setNext("input"),
-      actions.addMultiDelim(state.currentLexeme + action.input),
+      actions.addMultiDelim(
+        state.currentLexeme + action.input,
+        state.checkpoint
+      ),
       actions.resetCurrentLexeme(),
-      actions.movePointer()
+      actions.movePointer(action.input)
     )(state);
   }
 
   const error = `Unexpected token. Expected "=", but got "${action.input}" `;
   return compose(
     actions.raiseError(error),
-    actions.movePointer(),
+    actions.movePointer(action.input),
     actions.setNext("input")
   )(state);
 };
@@ -118,22 +139,27 @@ const multiDelim1StateReducer = (state, action) => {
 const inputStateReducer = (state, action) => {
   switch (action.symbolClass) {
     case "letter":
-      return idnStateReducer(state, action);
+      return enterStateReducerHOF(idnStateReducer)(state, action);
     case "digit":
-      return numberStateReducer(state, action);
+      return enterStateReducerHOF(numberStateReducer)(state, action);
     case "space":
-      return spaceStateReducer(state, action);
+      return enterStateReducerHOF(spaceStateReducer)(state, action);
     case "singleDelim":
-      return singleDelimStateReducer(state, action);
+      return enterStateReducerHOF(singleDelimStateReducer)(state, action);
     case "commentEnter":
-      return commentEnterStateReducer(state, action);
+      return enterStateReducerHOF(commentEnterStateReducer)(state, action);
     case "multiDelim1":
-      return enterMultiDelim1StateReducer(state, action);
+      return enterStateReducerHOF(enterMultiDelim1StateReducer)(state, action);
+    case "eof":
+      return { ...state, done: true };
     default:
-      return {
-        ...state,
-        errors: [...state.errors, "Char is not recognized"]
-      };
+      const error = `Char "${action.input}" at position (${
+        state.normalizedPos.row
+      }, ${state.normalizedPos.column}) is not recognized`;
+      return compose(
+        actions.raiseError(error),
+        actions.movePointer()
+      )(state);
   }
 };
 

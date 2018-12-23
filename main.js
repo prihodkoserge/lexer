@@ -1,48 +1,65 @@
-const fs = require("fs");
-const reducer = require("./reducers");
-const utils = require("./utils");
+const runScanner = require("./src/scanner");
+const ui = require("./src/ui");
 
-const fileContent = `
-  PROGRAM testProgram;
+const fileContent = `PROGRAM TESTPROGRAM;
   BEGIN
-    FOR testVariable1 := 12
+    FOR TESTVARIABLE := 12
     ENDFOR
-    (* comment *)
+    (**)   ENDFOR
   END
-`;
 
-const keywords = {
-  PROGRAM: 401,
-  BEGIN: 402,
-  END: 403,
-  LOOP: 404,
-  ENDLOOP: 405,
-  FOR: 406,
-  ENDFOR: 407
-};
+  BEGIN
+    FOR TESTVARIABLE := 12
+    ENDFOR
+    (**)   ENDFOR
+  END
+  BEGIN
+    FOR TESTVARIABLE := 12
+    ENDFOR
+    (**)   ENDFOR
+  END
+  BEGIN
+    FOR TESTVARIABLE := 12
+    ENDFOR
+    (**)   ENDFOR
+  END
+  BEGIN
+    FOR TESTVARIABLE := 12
+    ENDFOR
+    (**)   ENDFOR
+  END
+  BEGIN
+    FOR TESTVARIABLE := 12
+    ENDFOR
+    (**)   ENDFOR
+  END
+  BEGIN
+    FOR TESTVARIABLE := 12
+    ENDFOR
+    (**)   ENDFOR
+  END
+  BEGIN
+    FOR TESTVARIABLE := 12
+    ENDFOR
+    (**)   ENDFOR
+  END
+  BEGIN
+    FOR TESTVARIABLE := 12
+    ENDFOR
+    (**)   ENDFOR
+  END
+  BEGIN
+    FOR TESTVARIABLE := 12
+    ENDFOR
+    (**)   ENDFOR
+  END
+  
+  `;
 
-const initialState = {
-  lexemes: [],
-  identifiers: {},
-  constants: {},
-  multiDelims: {},
-  pos: 0,
-  current: "input",
-  currentLexeme: "",
-  errors: [],
-  keywords
-};
+const scanResult = runScanner(fileContent);
 
-const runScanner = content => {
-  let state = initialState;
-  while (state.pos < fileContent.length) {
-    state = reducer(state, utils.makeInputAction(fileContent[state.pos]));
-  }
-  return state;
-};
-
-console.log(runScanner(fileContent));
-
-module.exports = {
-  runScanner
-};
+ui.tableRenderer("Identifiers", scanResult.identifiers);
+ui.tableRenderer("Constants", scanResult.constants);
+ui.tableRenderer("Keywords", scanResult.keywords);
+ui.tableRenderer("Lexemes", scanResult.lexemes);
+ui.errorsRenderer(scanResult.errors);
